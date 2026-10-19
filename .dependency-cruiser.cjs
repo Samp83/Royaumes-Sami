@@ -38,7 +38,8 @@ module.exports = {
     {
       // Règle 3 : la plateforme est générique et ignore les modules métier.
       name: 'platform-ignores-modules',
-      comment: 'La plateforme technique ne connaît aucun module métier ni la racine de composition.',
+      comment:
+        'La plateforme technique ne connaît aucun module métier ni la racine de composition.',
       severity: 'error',
       from: { path: '^src/platform/' },
       to: { path: '^src/(modules|bootstrap)/' },
