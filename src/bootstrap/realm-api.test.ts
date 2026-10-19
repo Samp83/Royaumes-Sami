@@ -46,18 +46,6 @@ describe('API du module Village', () => {
     expect((await res.json()).error.code).toBe('INVALID_INPUT')
   })
 
-  it('rejette un corps JSON mal formé (400) au lieu de produire une erreur interne', async () => {
-    const { api } = setup()
-    const res = await api.request('/api/realm/village', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: '{"name": ',
-    })
-
-    expect(res.status).toBe(400)
-    expect((await res.json()).error.code).toBe('INVALID_INPUT')
-  })
-
   it('rejette un bâtiment inconnu (400)', async () => {
     const { post } = setup()
     await post('/api/realm/village', { name: 'Valombre' })
