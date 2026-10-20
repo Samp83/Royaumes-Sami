@@ -52,6 +52,7 @@ Un module n'est accessible depuis l'extérieur que par ses entrées publiques : 
 | --- | --- | --- |
 | `system` | Route de santé | `/api/system` |
 | `realm` | Village : fondation, production de ressources, amélioration des bâtiments | `/api/realm` |
+| [0002](0002-event-sourcing-village.md) | Event Sourcing pour le Village | Accepté |
 
 ## Documentation
 
