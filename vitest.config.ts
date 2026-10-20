@@ -9,5 +9,9 @@ export default defineConfig({
     environment: 'node',
     // Seuls les fichiers de test placés dans src/ sont exécutés.
     include: ['src/**/*.test.ts'],
+    // Le démarrage d'une base PGlite peut prendre plusieurs secondes, davantage encore
+    // lorsque plusieurs fichiers de test démarrent la leur en parallèle.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
   },
 })
