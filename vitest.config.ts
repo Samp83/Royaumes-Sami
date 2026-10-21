@@ -16,5 +16,6 @@ export default defineConfig({
     // Le démarrage d'une base PGlite peut prendre plusieurs secondes, davantage encore
     // lorsque plusieurs fichiers de test démarrent la leur en parallèle.
     testTimeout: 35_000,
+    hookTimeout: 35_000,
   },
 })
