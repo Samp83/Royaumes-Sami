@@ -17,7 +17,7 @@
 | S9 | L'inscription ne révèle pas si une adresse est inscrite | Création d'un compte avec une adresse déjà utilisée | | |
 | S10 | Toute route de l'API réservée aux joueurs refuse une requête anonyme | Tests « Contrôle d'accès à l'API du Village » ; racine de composition | | |
 | S11 | Un joueur ne peut accéder qu'à ses propres données | Test « isole les villages des joueurs » ; origine de `userId` dans les routes | | |
-| S12 | Les pages du jeu sont protégées sur le serveur, avant tout rendu | Mise en page `app/(jeu)/layout.tsx` ; accès à `/village` sans session | | |
+| S12 | Les pages du jeu sont protégées sur le serveur, avant tout rendu | Mise en page `app/(jeu)/layout.tsx` ; accès à `/village` sans session | La mise en page `app/(jeu)/layout.tsx` vérifie la session sur le serveur avant tout rendu, et elle est rendue à chaque requête (`force-dynamic`) : elle s'applique à toutes les pages du groupe `(jeu)`. Vérifié le 2026-10-23 sur la version construite : sans session, `/village`, `/market`, `/ranking`, `/tavern`, `/raid` et `/account` redirigent vers `/login` (307). Jusqu'à cette date, la mise en page se trouvait dans `app/(jeu)/village/layout.tsx` et ne protégeait que `/village` ; les autres pages s'affichaient sans session, leurs API restant protégées. | Conforme |
 | S13 | Les erreurs imprévues ne révèlent aucun détail technique au client | Gestionnaire `onError` de la racine de composition | | |
 | S14 | La déconnexion invalide la session sur le serveur | Réutilisation d'un cookie après déconnexion | | |
 | S15 | Une requête d'authentification accompagnée d'un cookie et émise depuis une autre origine est refusée | Appel de la déconnexion avec un en-tête `origin` étranger | | |
