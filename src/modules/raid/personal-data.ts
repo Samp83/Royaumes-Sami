@@ -1,14 +1,17 @@
+import { eq } from 'drizzle-orm'
+import type { Db } from '@/platform/db/client'
 import type { EventStore } from '@/platform/event-store/event-store'
-import type { PersonalDataContributor } from '@/platform/privacy/privacy'
+import { ERASED_VILLAGE, type PersonalDataContributor } from '@/platform/privacy/privacy'
 import { RAID_STREAM_PREFIX, raidStream } from './contracts'
 import { type RaidEvent, replay } from './domain/raid'
+import { villages } from './infrastructure/schema'
 
 /**
- * Données personnelles du Pillage : les pillages lancés et subis par le joueur.
- * Les événements du Pillage ne contiennent aucun nom : ils n'ont rien à réécrire lors d'un
- * effacement, et le module ne tient encore aucune table.
+ * Données personnelles du Pillage : les pillages lancés et subis par le joueur, et le nom de
+ * son village, copié dans la table de la projection des villages. Les événements du Pillage ne
+ * contiennent aucun nom : ils n'ont rien à réécrire lors d'un effacement.
  */
-export function createRaidPersonalData(store: EventStore): PersonalDataContributor {
+export function createRaidPersonalData(store: EventStore, db: Db): PersonalDataContributor {
   return {
     name: 'raid',
 
@@ -43,6 +46,11 @@ export function createRaidPersonalData(store: EventStore): PersonalDataContribut
         }))
 
       return { launched, suffered }
+    },
+
+    // La table des villages de la projection contient le nom du village du joueur.
+    async erase(playerId) {
+      await db.update(villages).set({ name: ERASED_VILLAGE }).where(eq(villages.playerId, playerId))
     },
   }
 }

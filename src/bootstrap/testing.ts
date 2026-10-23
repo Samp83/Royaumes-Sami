@@ -28,11 +28,18 @@ type TestUser = string | null
 /**
  * Application complète, assemblée sur une base de test vidée, avec une horloge contrôlée
  * et l'adaptateur d'authentification de test.
+ * Avec raidSeed, la graine des pillages est fixée : le tirage d'une égalité devient prévisible.
  * Avec villageService, le Village est extrait dans un service distinct (TD11), doté de sa
  * propre base. L'application et le service s'appellent sans réseau : chacun transmet ses
  * requêtes directement à l'autre, par la méthode request de Hono.
  */
-export async function createTestApi({ villageService = false } = {}) {
+export async function createTestApi({
+  villageService = false,
+  raidSeed,
+}: {
+  villageService?: boolean
+  raidSeed?: () => number
+} = {}) {
   const start = Date.UTC(2026, 0, 1)
   let now = start
   const db = await createTestDatabase()
@@ -59,6 +66,7 @@ export async function createTestApi({ villageService = false } = {}) {
     clock: () => now,
     realtime: { pollMs: 20, maxStreamMs: 150 },
     cronSecret: TEST_CRON_SECRET,
+    raidSeed,
     // Le distributeur compare la date de disponibilité des messages, fixée par la base en
     // heure réelle, à sa propre horloge : celle-ci part de l'heure réelle, et avance avec
     // l'horloge de l'application.

@@ -44,4 +44,4 @@ next-env.d.ts
 .data
 
 # Le modèle des variables d'environnement, lui, est versionné.
-!.env.example
+!.env.exemple

@@ -71,7 +71,7 @@ describe('Adaptateur du Pillage fondé sur le journal', () => {
 describe('Données personnelles du Pillage', () => {
   it('exporte les pillages lancés et subis par le joueur, sans niveau ni autre joueur', async () => {
     await repo.save('alice', 0, [launched('r1', 'alice', 'bob'), plundered('r1')], [])
-    const contributor = createRaidPersonalData(store)
+    const contributor = createRaidPersonalData(store, db)
 
     expect(await contributor.export('alice')).toEqual({
       launched: [

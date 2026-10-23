@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { createDungeonModule } from '@/modules/dungeon'
 import { createMarketModule } from '@/modules/market'
+import { createRaidModule } from '@/modules/raid'
 import { createRankingModule } from '@/modules/ranking'
 import { createRealmModule, createRemoteRealmModule } from '@/modules/realm'
 import { createSystemModule } from '@/modules/system'
@@ -43,6 +44,8 @@ export interface ApiDeps {
    * sur Vercel ; présent, toutes ses fonctions sont demandées au service, à cette adresse.
    */
   realmService?: { url: string; secret: string; fetch?: typeof fetch }
+  /** Graine du tirage d'un nouveau pillage ; aléatoire par défaut, fixée dans les tests. */
+  raidSeed?: () => number
 }
 
 /**
@@ -60,6 +63,7 @@ export function createApi({
   cronSecret,
   outbox,
   realmService,
+  raidSeed,
 }: ApiDeps) {
   // 0. Briques de la plateforme partagées par plusieurs modules.
   const projections = createProjectionRunner(db)
@@ -86,6 +90,14 @@ export function createApi({
   })
 
   const tavern = createTavernModule({ db, clock })
+  const raid = createRaidModule({
+    store,
+    db,
+    projections,
+    dispatch: () => dispatcher.dispatch(),
+    clock,
+    newSeed: raidSeed,
+  })
 
   // Droits des joueurs : chaque module fournit ses données personnelles. L'identité vient
   // en dernier : tant qu'elle n'est pas effacée, le joueur peut relancer un effacement interrompu.
@@ -97,6 +109,7 @@ export function createApi({
       market.personalData,
       ranking.personalData,
       tavern.personalData,
+      raid.personalData,
       createIdentityPersonalData(db),
     ],
     clock,
@@ -105,6 +118,7 @@ export function createApi({
   // Gestionnaires de messages, déclarés par les modules et confiés au distributeur.
   dispatcher.register(realm.handlers)
   dispatcher.register(market.handlers)
+  dispatcher.register(raid.handlers)
 
   // Règles d'accès aux canaux temps réel, déclarées par les modules.
   const policies: ChannelPolicy[] = [
@@ -175,6 +189,7 @@ export function createApi({
   app.use('/ranking/*', requireUser(auth))
   app.use('/market/*', requireUser(auth))
   app.use('/tavern/*', requireUser(auth))
+  app.use('/raid/*', requireUser(auth))
   app.use('/account', requireUser(auth))
   app.use('/account/*', requireUser(auth))
   app.use('/stream/*', requireUser(auth))
@@ -188,6 +203,7 @@ export function createApi({
     .route('/ranking', ranking.api)
     .route('/market', market.api)
     .route('/tavern', tavern.api)
+    .route('/raid', raid.api)
     .route('/account', createPrivacyApi(privacy))
     .route('/stream', createRealtimeApi({ store, policies, ...realtime }))
 }
