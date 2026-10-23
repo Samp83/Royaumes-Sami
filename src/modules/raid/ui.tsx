@@ -16,7 +16,7 @@ const ERRORS: Record<RaidError['code'] | 'INVALID_INPUT', string> = {
   SELF_RAID: 'Vous ne pouvez pas piller votre propre village.',
   TARGET_NOT_FOUND: "Ce village n'existe pas.",
   RAID_IN_PROGRESS: 'Un pillage est déjà en cours.',
-  TOO_SOON: 'Vous avez déjà pillé ce village il y a moins d’une heure.',
+  TOO_SOON: 'Vous avez déjà pillé ce village il y a moins de cinq minutes.',
 }
 
 /** Affiche des quantités de ressources : « 60 bois, 30 pierre », ou « rien ». */

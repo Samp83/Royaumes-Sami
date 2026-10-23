@@ -1,9 +1,10 @@
 import { eq, inArray, sql } from 'drizzle-orm'
 import { GAME_CHANNEL_PREFIX } from '@/modules/dungeon/contracts'
+import { RAID_STREAM_PREFIX } from '@/modules/raid/contracts'
 import { VILLAGE_CHANNEL_PREFIX } from '@/modules/realm/contracts'
 import type { StoredEvent } from '@/platform/event-store/event-store'
 import type { DbTransaction, Projection } from '@/platform/projection/projection'
-import { gamePlayers, players } from './schema'
+import { gamePlayers, players, raidsByDay } from './schema'
 
 /*
  * Données des événements lus par le Classement. Elles forment le « langage publié »
@@ -25,6 +26,18 @@ interface GameEndedData {
 interface VillageFoundedData {
   name: string
 }
+interface RaidPlunderedData {
+  at: number
+}
+
+/** Jour civil de Paris d'un instant, au format AAAA-MM-JJ : le jour d'un pillage réussi. */
+const PARIS_DAY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Paris',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+export const parisDay = (at: number) => PARIS_DAY.format(new Date(at))
 
 /** Identifiant tiré du nom d'un flux : « dungeon-7f3a » donne « 7f3a ». */
 const idFrom = (event: StoredEvent, prefix: string) => event.stream.slice(prefix.length)
@@ -40,12 +53,19 @@ async function recordPlayer(tx: DbTransaction, gameId: string, playerId: string,
 
 /**
  * Projection du classement : met à jour les totaux des joueurs à partir du journal.
- * Version 2 : ajout du meilleur butin.
+ * Version 2 : ajout du meilleur butin. Version 3 : ajout des pillages réussis par jour.
  */
 export const rankingProjection: Projection = {
   name: 'ranking',
-  version: 2,
-  eventTypes: ['GameCreated', 'PlayerJoined', 'GameEnded', 'VillageFounded', 'BuildingUpgraded'],
+  version: 3,
+  eventTypes: [
+    'GameCreated',
+    'PlayerJoined',
+    'GameEnded',
+    'VillageFounded',
+    'BuildingUpgraded',
+    'RaidPlundered',
+  ],
 
   async apply(event, tx) {
     switch (event.type) {
@@ -105,10 +125,25 @@ export const rankingProjection: Projection = {
           })
         return
       }
+
+      // Un pillage réussi, compté le jour de sa conclusion pour l'attaquant, désigné par le
+      // nom du flux : « raid-alice » donne « alice ».
+      case 'RaidPlundered': {
+        const data = event.data as unknown as RaidPlunderedData
+        await tx
+          .insert(raidsByDay)
+          .values({ playerId: idFrom(event, RAID_STREAM_PREFIX), day: parisDay(data.at), raids: 1 })
+          .onConflictDoUpdate({
+            target: [raidsByDay.playerId, raidsByDay.day],
+            set: { raids: sql`${raidsByDay.raids} + 1` },
+          })
+        return
+      }
     }
   },
 
   async reset(tx) {
+    await tx.delete(raidsByDay)
     await tx.delete(gamePlayers)
     await tx.delete(players)
   },

@@ -17,6 +17,8 @@ export interface RankingEntry {
   upgrades: number
   /** Or rapporté par la meilleure expédition gagnée. */
   bestLoot: number
+  /** Nombre de pillages réussis au cours du jour en cours, à l'heure de Paris. */
+  raidsToday: number
 }
 
 /** Classement renvoyé par l'API. */

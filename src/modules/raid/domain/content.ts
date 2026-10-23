@@ -8,7 +8,7 @@
 export const LOOT_SHARE = 0.5
 
 /** Délai minimal entre deux pillages d'un même village par un même joueur, en millisecondes. */
-export const SAME_TARGET_DELAY_MS = 60 * 60_000
+export const SAME_TARGET_DELAY_MS = 5 * 60_000
 
 /** Probabilité de succès d'un pillage lorsque les deux villages ont le même niveau combiné. */
 export const TIE_SUCCESS_CHANCE = 0.5

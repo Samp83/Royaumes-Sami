@@ -17,11 +17,13 @@ export interface RankingModuleDeps {
   db: Db
   /** Moteur des projections de la plateforme. */
   projections: ProjectionRunner
+  /** Horloge de référence, qui désigne le jour des pillages présentés ; l'heure réelle par défaut. */
+  clock?: () => number
 }
 
 /** Fabrique du module : assemble l'adaptateur de lecture, l'API et la règle du canal. */
-export function createRankingModule({ db, projections }: RankingModuleDeps) {
-  const reader = createDrizzleRankingReader(db, projections)
+export function createRankingModule({ db, projections, clock }: RankingModuleDeps) {
+  const reader = createDrizzleRankingReader(db, projections, clock)
 
   // Canal du classement : tout joueur connecté peut l'écouter. C'est un canal global, qui
   // annonce les événements appliqués par la projection, tous flux confondus. Il est discret :

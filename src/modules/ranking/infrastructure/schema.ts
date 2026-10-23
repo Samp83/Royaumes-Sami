@@ -19,6 +19,20 @@ export const players = ranking.table('players', {
 })
 
 /**
+ * Pillages réussis de chaque joueur, jour par jour (jour civil de Paris, au format AAAA-MM-JJ).
+ * Ajoutés par la version 3 de la projection, à partir des événements du Pillage.
+ */
+export const raidsByDay = ranking.table(
+  'raids_by_day',
+  {
+    playerId: text('player_id').notNull(),
+    day: text('day').notNull(),
+    raids: integer('raids').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.playerId, t.day] })],
+)
+
+/**
  * Joueurs de chaque expédition, retenus jusqu'à sa fin : l'événement GameEnded désigne
  * l'expédition, et cette table indique à quels joueurs attribuer son résultat.
  * Les compagnons n'y figurent pas, puisqu'ils n'arrivent pas par GameCreated ou PlayerJoined.

@@ -1,4 +1,4 @@
-import { and, eq, isNotNull } from 'drizzle-orm'
+import { and, asc, eq, isNotNull } from 'drizzle-orm'
 import type { Db } from '@/platform/db/client'
 import {
   ERASED_NAME,
@@ -7,11 +7,12 @@ import {
 } from '@/platform/privacy/privacy'
 import type { ProjectionRunner } from '@/platform/projection/projection'
 import { rankingProjection } from './infrastructure/ranking-projection'
-import { players } from './infrastructure/schema'
+import { players, raidsByDay } from './infrastructure/schema'
 
 /**
  * Données personnelles du Classement : le nom du joueur et celui de son village, copiés
- * par la projection. Le Classement n'a pas d'événements propres : il n'a rien à réécrire.
+ * par la projection, et ses pillages réussis par jour. Le Classement n'a pas d'événements
+ * propres : il n'a rien à réécrire.
  */
 export function createRankingPersonalData(
   db: Db,
@@ -24,7 +25,14 @@ export function createRankingPersonalData(
       // Comme toute lecture du classement, l'export rattrape d'abord la projection.
       await projections.catchUp(rankingProjection)
       const [row] = await db.select().from(players).where(eq(players.playerId, playerId))
-      return row ?? null
+      if (!row) return null
+      // Les pillages réussis du joueur, jour par jour.
+      const raids = await db
+        .select({ day: raidsByDay.day, raids: raidsByDay.raids })
+        .from(raidsByDay)
+        .where(eq(raidsByDay.playerId, playerId))
+        .orderBy(asc(raidsByDay.day))
+      return { ...row, raidsByDay: raids }
     },
 
     // Les totaux du joueur restent dans le classement, sous un nom neutre : ce sont exactement

@@ -24,7 +24,7 @@ carrière, mine).
    lui-même, ni piller un joueur sans village.
 3. Un joueur n'a qu'un pillage en cours à la fois : il ne peut en lancer un nouveau tant que
    le précédent n'est pas terminé.
-4. Un joueur ne peut pas piller le même village plus d'une fois par heure.
+4. Un joueur ne peut pas piller le même village plus d'une fois toutes les cinq minutes.
 5. Si le niveau combiné de l'attaquant est strictement supérieur à celui du défenseur, le
    pillage réussit.
 6. Si le niveau combiné de l'attaquant est strictement inférieur à celui du défenseur, le
@@ -52,7 +52,7 @@ carrière, mine).
 | Voir les villages qu'il peut piller, sans leur niveau | Lecture | `GET /api/raid/targets` |
 | Lancer un pillage contre un village | Commande | `POST /api/raid/raids` |
 | Suivre ses pillages, lancés et subis, et leur résultat | Lecture | `GET /api/raid/raids` |
-| Consulter le classement des pillages réussis du jour | Lecture | `GET /api/ranking/raids` |
+| Consulter les pillages réussis du jour de chaque joueur, dans le Classement | Lecture | `GET /api/ranking/players` (colonne « Pillages du jour ») |
 
 ## Le stockage envisagé
 
@@ -94,6 +94,7 @@ efface son nom de village dans la table des cibles.
 1. B4 : la projection des niveaux et des noms de villages, avec son point de reprise et sa
    version.
 2. B6 : une communication avec deux modules existants, le Village et le Classement.
-3. B2 : la limite d'un pillage par heure contre un même village, appliquée sans tâche de fond.
+3. B2 : la limite d'un pillage toutes les cinq minutes contre un même village, appliquée sans
+   tâche de fond.
 4. B8 : une fonction d'aptitude qui vérifie que les événements du Pillage ne contiennent aucun
    nom de joueur ni de village.

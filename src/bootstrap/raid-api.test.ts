@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RaidSummary, RaidView, Target } from '@/modules/raid/contracts'
+import type { RankingEntry } from '@/modules/ranking/contracts'
 import type { Levels, Stock } from '@/modules/realm/contracts'
 import { createTestApi } from './testing'
 
@@ -136,14 +137,16 @@ describe('API du module Pillage', () => {
     expect(body.raid).toMatchObject({ outcome: 'success', status: 'completed' })
   })
 
-  it("refuse de piller le même village plus d'une fois par heure (règle 4)", async () => {
+  it("refuse de piller le même village plus d'une fois toutes les cinq minutes (règle 4)", async () => {
     const api = await withVillages()
     await raid(api, 'alice', 'bob')
     const again = await raid(api, 'alice', 'bob')
     expect(again.res.status).toBe(409)
     expect(again.body.error.code).toBe('TOO_SOON')
 
-    api.advance(60)
+    api.advance(4)
+    expect((await raid(api, 'alice', 'bob')).body.error.code).toBe('TOO_SOON')
+    api.advance(1)
     expect((await raid(api, 'alice', 'bob')).res.status).toBe(201)
   })
 
@@ -176,5 +179,17 @@ describe('API du module Pillage', () => {
     // Alice supprime son compte : Bob ne voit plus le nom de son village dans son historique.
     await api.api.request('/api/account', { method: 'DELETE', headers: { 'x-test-user': 'alice' } })
     expect(await historyOf(api, 'bob')).toMatchObject([{ opponentVillage: 'Village effacé' }])
+  })
+
+  it('présente au Classement les pillages réussis du jour (règle 12)', async () => {
+    const api = await withVillages()
+    await aliceStronger(api)
+    await raid(api, 'alice', 'bob')
+
+    const res = await api.get('/api/ranking/players', 'carol')
+    const { entries } = (await res.json()) as { entries: RankingEntry[] }
+    const raidsOf = (player: string) => entries.find((e) => e.playerId === player)?.raidsToday
+    expect(raidsOf('alice')).toBe(1)
+    expect(raidsOf('bob')).toBe(0)
   })
 })

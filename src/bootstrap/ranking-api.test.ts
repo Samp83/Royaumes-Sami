@@ -38,6 +38,7 @@ describe('API du module Classement', () => {
         gold: 0,
         upgrades: 1,
         bestLoot: 0,
+        raidsToday: 0,
       },
     ])
   })

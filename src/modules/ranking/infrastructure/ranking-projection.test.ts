@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createTestDatabase } from '@/platform/db/client'
+import { createTestDatabase, type Db } from '@/platform/db/client'
 import {
   createEventStore,
   type EventStore,
@@ -10,10 +10,11 @@ import type { RankingReader } from '../application/ranking-reader'
 import { createDrizzleRankingReader } from './drizzle-ranking-reader'
 
 // Chaque test dispose d'un journal neuf et d'un classement vide.
+let db: Db
 let store: EventStore
 let reader: RankingReader
 beforeEach(async () => {
-  const db = await createTestDatabase()
+  db = await createTestDatabase()
   store = createEventStore(db)
   reader = createDrizzleRankingReader(db, createProjectionRunner(db))
 })
@@ -90,5 +91,36 @@ describe('Projection du classement', () => {
       [2, 'bob'],
       [3, 'carol'],
     ])
+  })
+
+  it("compte les pillages réussis du jour, à l'heure de Paris, sans changer l'ordre", async () => {
+    // 1er janvier, 23 h 30 à Paris, puis 2 janvier, 0 h 30 et 10 h : deux pillages le 2 janvier.
+    const day1Late = Date.UTC(2026, 0, 1, 22, 30)
+    const day2Early = Date.UTC(2026, 0, 1, 23, 30)
+    const day2 = Date.UTC(2026, 0, 2, 9, 0)
+    const plundered = (raidId: string, at: number): NewEvent => ({
+      type: 'RaidPlundered',
+      data: { raidId, loot: { wood: 10 }, at },
+    })
+    await store.append('village-alice', 0, [{ type: 'VillageFounded', data: { name: 'Valombre' } }])
+    await store.append('village-bob', 0, [
+      { type: 'VillageFounded', data: { name: 'Clairval' } },
+      { type: 'BuildingUpgraded', data: {} },
+    ])
+    await store.append('raid-alice', 0, [
+      plundered('r1', day1Late),
+      plundered('r2', day2Early),
+      plundered('r3', day2),
+    ])
+
+    const onDay2 = createDrizzleRankingReader(db, createProjectionRunner(db), () => day2)
+    const { entries } = await onDay2.top(20)
+    // Bob reste devant Alice : les pillages ne comptent pas dans l'ordre du classement.
+    expect(entries.map((entry) => [entry.playerId, entry.raidsToday])).toEqual([
+      ['bob', 0],
+      ['alice', 2],
+    ])
+    const onDay1 = createDrizzleRankingReader(db, createProjectionRunner(db), () => day1Late)
+    expect((await onDay1.top(20)).entries.find((e) => e.playerId === 'alice')?.raidsToday).toBe(1)
   })
 })

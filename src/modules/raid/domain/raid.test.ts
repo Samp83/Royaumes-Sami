@@ -72,7 +72,7 @@ describe('Pillage - qui peut piller qui', () => {
     })
   })
 
-  it("refuse de piller le même village plus d'une fois par heure (règle 4)", () => {
+  it("refuse de piller le même village plus d'une fois toutes les cinq minutes (règle 4)", () => {
     // Alice a pillé Bob à T0, et ce pillage est terminé.
     const state: RaidState = { ...initialState, attackerId: 'alice', lastRaidAt: { bob: T0 } }
 
@@ -80,7 +80,7 @@ describe('Pillage - qui peut piller qui', () => {
       ok: false,
       error: { code: 'TOO_SOON', retryAt: T0 + SAME_TARGET_DELAY_MS },
     })
-    // Un autre village peut être pillé aussitôt, et le même au bout d'une heure.
+    // Un autre village peut être pillé aussitôt, et le même au bout de cinq minutes.
     expect(decide(state, launch({ defenderId: 'carol' }), T0).ok).toBe(true)
     expect(decide(state, launch(), T0 + SAME_TARGET_DELAY_MS).ok).toBe(true)
   })

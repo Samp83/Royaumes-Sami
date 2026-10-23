@@ -94,6 +94,7 @@ export function RankingScreen({ userId }: { userId: string }) {
                 </th>
                 <th>Meilleur butin</th>
                 <th>Améliorations</th>
+                <th>Pillages du jour</th>
               </tr>
             </thead>
             <tbody>
@@ -109,6 +110,7 @@ export function RankingScreen({ userId }: { userId: string }) {
                   <td>{entry.gold}</td>
                   <td>{entry.bestLoot}</td>
                   <td>{entry.upgrades}</td>
+                  <td>{entry.raidsToday}</td>
                 </tr>
               ))}
             </tbody>
