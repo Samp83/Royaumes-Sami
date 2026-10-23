@@ -13,10 +13,10 @@ export interface Look {
 
 export const theme: Record<string, Look> = {
   village: { glyph: '🏰', label: 'Village' },
-  wood: { glyph: '🪵', label: 'Bois' },
-  stone: { glyph: '🪨', label: 'Pierre' },
-  gold: { glyph: '🪙', label: 'Or' },
-  sawmill: { glyph: '🪚', label: 'Scierie' },
+  wood: { glyph: '🌲', label: 'Bois' },
+  stone: { glyph: '🧱', label: 'Pierre' },
+  gold: { glyph: '💰', label: 'Or' },
+  sawmill: { glyph: '🪓', label: 'Scierie' },
   quarry: { glyph: '⛏️', label: 'Carrière' },
   mine: { glyph: '⚒️', label: 'Mine' },
   dungeon: { glyph: '⚔️', label: 'Donjon' },
