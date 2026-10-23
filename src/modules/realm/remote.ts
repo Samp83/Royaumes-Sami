@@ -116,6 +116,8 @@ export function createRemoteRealmModule({
   const handlers: Record<string, MessageHandler> = {
     [REALM_TOPICS.withdraw]: relayAfter(forward),
     [REALM_TOPICS.deposit]: relayAfter(forward),
+    [REALM_TOPICS.seize]: relayAfter(forward),
+    [REALM_TOPICS.loseLevel]: relayAfter(forward),
   }
 
   // Canal temps réel : inchangé, il lit les copies relayées dans le journal local.

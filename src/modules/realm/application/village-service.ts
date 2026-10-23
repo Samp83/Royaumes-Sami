@@ -19,11 +19,19 @@ export type CommandResult = { ok: true; view: VillageView } | { ok: false; error
 function resultOf(event: VillageEvent): TransferResult | null {
   switch (event.type) {
     case 'ResourcesWithdrawn':
-      return { transferId: event.data.transferId, outcome: 'withdrawn' }
+      return {
+        transferId: event.data.transferId,
+        outcome: 'withdrawn',
+        resources: event.data.resources,
+      }
     case 'WithdrawalRefused':
       return { transferId: event.data.transferId, outcome: 'refused', missing: event.data.missing }
     case 'ResourcesDeposited':
       return { transferId: event.data.transferId, outcome: 'deposited' }
+    case 'BuildingDowngraded':
+      return { transferId: event.data.transferId, outcome: 'downgraded' }
+    case 'LevelLossRefused':
+      return { transferId: event.data.transferId, outcome: 'refused' }
     default:
       return null
   }

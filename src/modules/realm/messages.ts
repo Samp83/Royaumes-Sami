@@ -1,7 +1,6 @@
 import type { MessageHandler } from '@/platform/outbox/outbox'
 import type { VillageService } from './application/village-service'
-import { REALM_TOPICS, TransferRequest } from './contracts'
-import type { TransferCommand } from './domain/village'
+import { LoseLevelRequest, REALM_TOPICS, SeizeRequest, TransferRequest } from './contracts'
 
 /**
  * Gestionnaires des messages adressés au Village, remis par le distributeur de la boîte
@@ -11,7 +10,7 @@ import type { TransferCommand } from './domain/village'
 export function createRealmHandlers(service: VillageService): Record<string, MessageHandler> {
   /** Gestionnaire d'un type de mouvement. */
   const handle =
-    (type: TransferCommand['type']): MessageHandler =>
+    (type: 'WithdrawResources' | 'DepositResources'): MessageHandler =>
     async (message) => {
       // Le contenu d'un message est vérifié comme celui d'une requête : il provient d'un autre
       // module. Un message mal formé lève une erreur, et finira abandonné en lettre morte.
@@ -22,5 +21,17 @@ export function createRealmHandlers(service: VillageService): Record<string, Mes
   return {
     [REALM_TOPICS.withdraw]: handle('WithdrawResources'),
     [REALM_TOPICS.deposit]: handle('DepositResources'),
+
+    // Prélèvement d'une part du stock, demandé par exemple par le Pillage.
+    [REALM_TOPICS.seize]: async (message) => {
+      const { transferId, playerId, share, replyTo } = SeizeRequest.parse(message.payload)
+      await service.transfer(playerId, { type: 'SeizeShare', transferId, share }, replyTo)
+    },
+
+    // Perte d'un niveau, demandée par exemple par le Pillage.
+    [REALM_TOPICS.loseLevel]: async (message) => {
+      const { transferId, playerId, building, replyTo } = LoseLevelRequest.parse(message.payload)
+      await service.transfer(playerId, { type: 'LoseLevel', transferId, building }, replyTo)
+    },
   }
 }

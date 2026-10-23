@@ -38,8 +38,8 @@ export interface VillageState {
   transfers: Record<string, TransferOutcome>
 }
 
-/** Issue d'un mouvement de ressources. */
-export type TransferOutcome = 'withdrawn' | 'refused' | 'deposited'
+/** Issue d'un mouvement de ressources, ou d'une perte de niveau demandée par un autre module. */
+export type TransferOutcome = 'withdrawn' | 'refused' | 'deposited' | 'downgraded'
 
 /** État d'un village qui n'a encore connu aucun événement. */
 export const initialState: VillageState = {
@@ -75,6 +75,13 @@ export type VillageEvent =
       type: 'ResourcesDeposited'
       data: { transferId: string; resources: Partial<Stock>; at: number }
     }
+  // Perte d'un niveau demandée par un autre module, comme le Pillage. Elle porte, elle aussi,
+  // l'identifiant choisi par le demandeur.
+  | {
+      type: 'BuildingDowngraded'
+      data: { transferId: string; building: Building; toLevel: number; at: number }
+    }
+  | { type: 'LevelLossRefused'; data: { transferId: string; building: Building; at: number } }
 
 // ---------------------------------------------------------------------------
 // Commandes : des intentions, nommées à l'impératif
@@ -89,6 +96,10 @@ export type VillageCommand =
 export type TransferCommand =
   | { type: 'WithdrawResources'; transferId: string; resources: Partial<Stock> }
   | { type: 'DepositResources'; transferId: string; resources: Partial<Stock> }
+  /** Prélever une part de chaque ressource du stock (0,5 : la moitié), arrondie à l'entier inférieur. */
+  | { type: 'SeizeShare'; transferId: string; share: number }
+  /** Réduire de 1 le niveau d'un bâtiment, sans jamais descendre sous son niveau de départ. */
+  | { type: 'LoseLevel'; transferId: string; building: Building }
 
 // ---------------------------------------------------------------------------
 // Résultat d'une décision : des événements, ou une erreur métier
@@ -189,6 +200,20 @@ export function evolve(state: VillageState, event: VillageEvent): VillageState {
         transfers: { ...current.transfers, [event.data.transferId]: 'deposited' },
       }
     }
+
+    // Comme une amélioration : le stock est d'abord calculé avec la production des anciens
+    // niveaux, et le nouveau niveau s'applique à partir de cet instant.
+    case 'BuildingDowngraded': {
+      const current = accrue(state, event.data.at)
+      return {
+        ...current,
+        levels: { ...current.levels, [event.data.building]: event.data.toLevel },
+        transfers: { ...current.transfers, [event.data.transferId]: 'downgraded' },
+      }
+    }
+
+    case 'LevelLossRefused':
+      return { ...state, transfers: { ...state.transfers, [event.data.transferId]: 'refused' } }
   }
 }
 
@@ -298,6 +323,51 @@ export function decide(state: VillageState, command: VillageCommand, now: number
           {
             type: 'ResourcesDeposited',
             data: { transferId: command.transferId, resources: command.resources, at: now },
+          },
+        ],
+      }
+    }
+
+    case 'SeizeShare': {
+      if (command.transferId in state.transfers) return { ok: true, events: [] }
+      // La part est calculée sur le stock à l'instant du prélèvement, production comprise,
+      // et arrondie à l'entier inférieur : le prélèvement ne dépasse jamais le stock. Un stock
+      // vide, ou un village qui n'est pas fondé, donne un prélèvement sans aucune ressource.
+      const stock = accrue(state, now).stock
+      const resources: Partial<Stock> = {}
+      for (const resource of RESOURCES) {
+        const amount = Math.floor(stock[resource] * command.share)
+        if (amount > 0) resources[resource] = amount
+      }
+      return {
+        ok: true,
+        events: [
+          {
+            type: 'ResourcesWithdrawn',
+            data: { transferId: command.transferId, resources, at: now },
+          },
+        ],
+      }
+    }
+
+    case 'LoseLevel': {
+      if (command.transferId in state.transfers) return { ok: true, events: [] }
+      const { transferId, building } = command
+      const level = state.levels[building]
+      // Un bâtiment n'est jamais ramené sous son niveau de départ : le refus est un fait,
+      // enregistré comme celui d'un prélèvement, et répété à l'identique en cas de doublon.
+      if (!state.founded || level <= STARTING_LEVELS[building]) {
+        return {
+          ok: true,
+          events: [{ type: 'LevelLossRefused', data: { transferId, building, at: now } }],
+        }
+      }
+      return {
+        ok: true,
+        events: [
+          {
+            type: 'BuildingDowngraded',
+            data: { transferId, building, toLevel: level - 1, at: now },
           },
         ],
       }

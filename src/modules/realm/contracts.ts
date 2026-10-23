@@ -6,8 +6,8 @@
 import { z } from 'zod'
 import { BUILDINGS, type Stock } from './domain/catalog'
 
-export type { Building, Resource, Stock } from './domain/catalog'
-export { BUILDINGS, MAX_LEVEL, RESOURCES } from './domain/catalog'
+export type { Building, Levels, Resource, Stock } from './domain/catalog'
+export { BUILDINGS, MAX_LEVEL, RESOURCES, STARTING_LEVELS } from './domain/catalog'
 export type { DomainError, VillageView } from './domain/village'
 export { stockAt } from './domain/village'
 
@@ -45,6 +45,10 @@ export const REALM_TOPICS = {
   withdraw: 'realm.withdraw',
   /** Verser des ressources à un village ; le versement ne peut pas être refusé. */
   deposit: 'realm.deposit',
+  /** Prélever une part du stock d'un village ; la réponse indique les quantités prélevées. */
+  seize: 'realm.seize',
+  /** Réduire de 1 le niveau d'un bâtiment ; refusé si le bâtiment est à son niveau de départ. */
+  loseLevel: 'realm.lose-level',
 } as const
 
 /** Quantité d'une ressource dans un mouvement : un entier strictement positif. */
@@ -68,10 +72,31 @@ export const TransferRequest = z.object({
 })
 export type TransferRequest = z.infer<typeof TransferRequest>
 
+/** Contenu d'un message de prélèvement d'une part du stock. */
+export const SeizeRequest = z.object({
+  transferId: z.string().min(1),
+  playerId: z.string().min(1),
+  /** Part de chaque ressource prélevée, entre 0 exclu et 1 inclus : 0,5 pour la moitié. */
+  share: z.number().gt(0).max(1),
+  replyTo: z.string().min(1).optional(),
+})
+export type SeizeRequest = z.infer<typeof SeizeRequest>
+
+/** Contenu d'un message de perte de niveau. */
+export const LoseLevelRequest = z.object({
+  transferId: z.string().min(1),
+  playerId: z.string().min(1),
+  building: z.enum(BUILDINGS),
+  replyTo: z.string().min(1).optional(),
+})
+export type LoseLevelRequest = z.infer<typeof LoseLevelRequest>
+
 /** Contenu du message de réponse envoyé par le Village au sujet indiqué par replyTo. */
 export interface TransferResult {
   transferId: string
-  outcome: 'withdrawn' | 'refused' | 'deposited'
+  outcome: 'withdrawn' | 'refused' | 'deposited' | 'downgraded'
+  /** Quantités prélevées : utiles au demandeur d'un prélèvement de part, qui ne les connaît pas. */
+  resources?: Partial<Stock>
   /** Quantités manquantes, en cas de refus. */
   missing?: Partial<Stock>
 }
