@@ -13,9 +13,18 @@ export default defineConfig({
     // sont lancés par la construction Vercel, où NODE_ENV vaut « production ». Ils ne
     // dépendent ainsi d'aucune variable de l'environnement de production.
     env: { NODE_ENV: 'test' },
-    // Le démarrage d'une base PGlite peut prendre plusieurs secondes, davantage encore
-    // lorsque plusieurs fichiers de test démarrent la leur en parallèle.
-    testTimeout: 35_000,
-    hookTimeout: 35_000,
+    // Chaque fichier de test de l'API démarre sa propre base PGlite : sur un poste chargé,
+    // ce démarrage peut dépasser le délai par défaut de cinq secondes.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
+    // Couverture du code par les tests (TD11), mesurée par la commande pnpm test:coverage.
+    coverage: {
+      provider: 'v8',
+      // Seul le code du projet est mesuré, hors tests et hors pages Next.js.
+      include: ['src/**/*.ts', 'src/**/*.tsx'],
+      exclude: ['src/**/*.test.ts'],
+      reporter: ['text-summary', 'html'],
+      reportsDirectory: 'coverage',
+    },
   },
 })
