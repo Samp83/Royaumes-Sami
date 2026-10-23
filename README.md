@@ -78,9 +78,10 @@ Un module n'est accessible depuis l'extérieur que par ses entrées publiques : 
 | `system` | Route de santé | `/api/system` |
 | `realm` | Village : fondation, production de ressources, amélioration des bâtiments | `/api/realm` |
 | `dungeon` | Donjon : expéditions de un à quatre héros, compagnons pilotés par l'ordinateur, deux niveaux de difficulté, combats en manches simultanées | `/api/dungeon` |
-| `ranking` | Classement des joueurs, construit à partir des événements du Village et du Donjon | `/api/ranking` |
+| `ranking` | Classement des joueurs, construit à partir des événements du Village, du Donjon et du Pillage | `/api/ranking` |
 | `market` | Marché : échanges de ressources entre joueurs, par une saga orchestrée | `/api/market` |
 | `tavern` | Taverne : salon de discussion commun et présence des joueurs, sans Event Sourcing | `/api/tavern` |
+| `raid` | Pillage : attaque du village d'un autre joueur ; selon les niveaux combinés des bâtiments des deux villages, l'attaquant prend la moitié des ressources du défenseur ou perd un niveau de bâtiment | `/api/raid` |
 
 ## Temps réel
 
@@ -101,6 +102,10 @@ Les canaux du Donjon, du Classement et du Marché sont discrets : ils ne transme
 le type et la version des événements, et chaque navigateur relit sa propre vue, filtrée
 par le serveur.
 
+Le Pillage n'a pas de canal propre : son écran relit les cibles et l'historique après chaque
+lancement. Le canal global `ranking` annonce aussi les pillages réussis, afin que la colonne
+« Pillages du jour » du classement se mette à jour d'elle-même.
+
 Un flux se ferme de lui-même au bout de 240 secondes, et le navigateur s'y reconnecte
 sans perte d'événement. En développement, la variable `STREAM_MAX_SECONDS` permet de
 raccourcir cette durée pour observer la reconnexion.
@@ -115,6 +120,12 @@ chaque consultation du Marché, et chaque jour par la tâche planifiée `/api/cr
 est garantie au moins une fois : les gestionnaires de messages sont idempotents. Un message qui
 échoue dix fois est abandonné : la tâche quotidienne le signale, et le script
 `scripts/dead-letters.ts` permet de l'examiner, puis de le relancer une fois sa cause corrigée.
+
+Le Pillage orchestre lui aussi une saga avec le Village (ADR 0011) : `realm.seize` prélève la
+moitié du stock du défenseur, `realm.lose-level` fait perdre un niveau à l'attaquant, et
+`realm.deposit` verse le butin. Ses messages sont distribués après chaque lancement et chaque
+consultation de l'historique des pillages. Le Pillage lit les niveaux des villages dans le
+langage publié du Village, par une projection, sans jamais lire ses tables.
 
 ## Service Village extrait
 
@@ -142,8 +153,14 @@ page « Mes données » :
   d'événements (ADR 0008). Chaque effacement est consigné dans `platform.erasures`.
 
 Les messages de la Taverne sont conservés trente jours, et la présence d'un joueur deux
-minutes après son dernier signal. Ces durées sont appliquées à chaque lecture, et chaque jour
-par la tâche planifiée `/api/cron/daily`.
+minutes après son dernier signal. L'historique des pillages présenté aux joueurs est lui aussi
+limité à trente jours. Ces durées sont appliquées à chaque lecture, et chaque jour par la
+tâche planifiée `/api/cron/daily`.
+
+Les événements du Pillage ne contiennent que des identifiants, jamais un nom de joueur ou de
+village (ADR 0010) : l'effacement d'un compte n'a rien à y réécrire, et une fonction
+d'aptitude vérifie qu'aucun nom n'y est ajouté. Le nom du village d'un joueur effacé est
+retiré de la table des villages du Pillage.
 
 ## Base de données
 
@@ -153,7 +170,8 @@ démarrage. Pour repartir d'une base vide, arrêtez le serveur et supprimez le r
 
 Les tests utilisent une base PGlite en mémoire, recréée pour chaque fichier de test.
 
-Le classement et la liste des expéditions ouvertes sont des modèles de lecture, tenus à jour
+Le classement, la liste des expéditions ouvertes, ainsi que les
+villages et l'historique du Pillage (schéma `raid`) sont des modèles de lecture, tenus à jour
 par des projections à partir du journal d'événements (ADR 0006). Chaque projection est
 rattrapée à la consultation, et reconstruite automatiquement lorsque sa version change :
 une modification qui change le contenu de ses tables doit donc augmenter sa version.
@@ -220,6 +238,16 @@ quotidienne.
 L'effacement d'un compte parcourt tout le journal d'événements : sa durée croît avec la taille
 du journal. L'identifiant d'un joueur effacé reste dans le journal, sous une forme
 pseudonymisée : plus aucune table ne le relie à une personne (ADR 0008).
+
+L'issue d'un pillage est décidée sur les niveaux lus dans une projection du Village, rattrapée
+juste avant le lancement : une amélioration enregistrée au même instant peut ne pas être prise
+en compte. Les effets du pillage, eux, sont toujours calculés par le Village (ADR 0011). Si la
+distribution des messages est interrompue, le pillage reste en cours, et l'attaquant ne peut en
+lancer un autre qu'à la reprise de la saga : à la consultation suivante de l'historique, ou
+lors de la tâche quotidienne. Un joueur plus développé peut piller le même village toutes les
+cinq minutes, en lui prenant chaque fois la moitié de ce qui reste. La durée de conservation
+de trente jours ne porte que sur l'historique présenté : le journal garde les événements de
+tous les pillages (ADR 0010).
 
 Le service Village extrait n'est pas prêt pour la production : ses migrations, la pagination
 de son flux publié et la distribution de sa boîte d'envoi restent à traiter. Ces limites, et

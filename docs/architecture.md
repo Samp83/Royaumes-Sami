@@ -12,7 +12,7 @@ dans le même commit que la modification qu'ils décrivent.
 ```mermaid
 flowchart TB
   joueur["Joueur<br/>[Personne]<br/>Joue depuis un navigateur,<br/>sur ordinateur ou sur téléphone"]
-  royaumes["Royaumes<br/>[Système logiciel]<br/>Jeu web multijoueur : village, donjon,<br/>classement, marché et taverne"]
+  royaumes["Royaumes<br/>[Système logiciel]<br/>Jeu web multijoueur : village, donjon,<br/>classement, marché, taverne et pillage"]
   joueur -->|"Gère son village, joue avec les autres joueurs,<br/>reçoit les changements en direct (HTTPS)"| royaumes
 ```
 
@@ -28,7 +28,7 @@ flowchart TB
   subgraph royaumes["Système Royaumes"]
     web["Interface web<br/>[Conteneur : React, dans le navigateur]<br/>Pages du jeu et page de connexion"]
     serveur["Application serveur<br/>[Conteneur : Next.js et Hono, fonctions Vercel, Francfort]<br/>Rendu des pages, API JSON,<br/>authentification, flux temps réel"]
-    base[("Base de données<br/>[Conteneur : PostgreSQL, Neon, Francfort]<br/>Schéma platform : journal, points de reprise,<br/>boîte d'envoi, registre des effacements<br/>Schéma identity : comptes et sessions<br/>Schémas ranking, dungeon et market :<br/>modèles de lecture<br/>Schéma tavern : messages et présence")]
+    base[("Base de données<br/>[Conteneur : PostgreSQL, Neon, Francfort]<br/>Schéma platform : journal, points de reprise,<br/>boîte d'envoi, registre des effacements<br/>Schéma identity : comptes et sessions<br/>Schémas ranking, dungeon et market :<br/>modèles de lecture<br/>Schéma tavern : messages et présence<br/>Schéma raid : modèles de lecture du Pillage")]
   end
   joueur -->|"Utilise"| web
   web -->|"Pages, appels de l'API avec le cookie de session<br/>(HTTPS, JSON)"| serveur
@@ -42,10 +42,11 @@ flowchart TB
 | Application serveur | Next.js, Hono, Better Auth, Drizzle | Contrôle d'accès, règles du jeu, enregistrement des événements, diffusion des flux |
 | Base de données | PostgreSQL (Neon en production, PGlite en local et en test) | Conservation du journal d'événements, des comptes et des sessions ; modèles de lecture des modules |
 
-Le journal d'événements est la seule source de vérité des modules Village, Donjon et Marché.
+Le journal d'événements est la seule source de vérité des modules Village, Donjon, Marché et Pillage.
 La Taverne n'enregistre pas d'événements : ses tables sont sa propre source de vérité (ADR 0008).
-Les tables des schémas `ranking`, `dungeon` et `market` sont des modèles de lecture, dérivés du journal par des projections : elles peuvent
-être vidées puis reconstruites à tout moment, sans perte d'information.
+Les tables des schémas `ranking`, `dungeon`, `market` et `raid` sont des modèles de lecture,
+dérivés du journal par des projections : elles peuvent être vidées puis reconstruites à tout
+moment, sans perte d'information.
 
 L'interface web ne communique jamais directement avec la base : toute lecture et toute
 écriture passent par l'application serveur, qui applique le contrôle d'accès.
@@ -67,6 +68,7 @@ flowchart TB
     ranking["ranking<br/>Classement : projection,<br/>lecture, API, canal global"]
     market["market<br/>Marché : orchestrateur de la saga,<br/>projection des offres, API, canal global"]
     tavern["tavern<br/>Taverne : messages et présence<br/>en tables, API, canal à source propre"]
+    raid["raid<br/>Pillage : domaine, orchestrateur de la saga,<br/>dépôt fondé sur le journal, projections des villages<br/>et de l'historique, API, tâche quotidienne"]
   end
   subgraph platform["src/platform"]
     auth["auth<br/>Port AuthPort,<br/>adaptateur Better Auth"]
@@ -83,13 +85,14 @@ flowchart TB
   route --> server
   pages --> server
   server --> createapi
-  createapi --> system & realm & dungeon & ranking & market & tavern & auth & http & realtime & projection & outbox & privacy & cron
+  createapi --> system & realm & dungeon & ranking & market & tavern & raid & auth & http & realtime & projection & outbox & privacy & cron
   realm --> store & realtime & http & outbox
   market --> store & projection & realtime & http & outbox
   dungeon --> store & projection & realtime & http
   ranking --> projection & realtime & http
   tavern --> realtime & http & db
-  realm & dungeon & market & ranking & tavern --> privacy
+  raid --> store & projection & http & outbox
+  realm & dungeon & market & ranking & tavern & raid --> privacy
   privacy --> store
   auth --> privacy
   realtime --> store & http
@@ -117,6 +120,18 @@ La seule dépendance directe porte sur les contrats du Village (`REALM_TOPICS`, 
 qui décrivent ces messages. Chaque transaction ne modifie que les données d'un seul module,
 et la boîte d'envoi (ADR 0007).
 
+Le module `raid` communique avec deux modules existants, sans importer d'autre fichier que
+leurs contrats (ADR 0011) :
+
+- il lit le langage publié du Village (`VillageFounded`, `BuildingUpgraded`,
+  `BuildingDowngraded`) par une projection, qui tient le nom et les niveaux de chaque village
+  dans son schéma `raid` ;
+- il orchestre avec le Village une saga par la boîte d'envoi : `realm.seize` prélève la moitié
+  du stock du défenseur, `realm.lose-level` fait perdre un niveau à l'attaquant, et
+  `realm.deposit` verse le butin. Le Village répond au sujet `raid.transfer-result` ;
+- le Classement lit ses événements `RaidPlundered`, et compte les pillages réussis de chaque
+  joueur, jour par jour, dans sa propre table `ranking.raids_by_day`.
+
 Chaque module déclare ses données personnelles à la brique `privacy`, au moyen d'un fichier
 `personal-data.ts` : il les exporte, désigne les champs personnels de ses événements, et les
 efface de ses tables. La brique `privacy` contient la seule fonction du projet qui modifie un
@@ -134,12 +149,47 @@ dependency-cruiser (`.dependency-cruiser.cjs`) à chaque exécution de `pnpm ver
 - aucune dépendance circulaire n'est admise ;
 - un module n'importe jamais les tables de la plateforme : il passe par ses fonctions.
 
-Deux fonctions d'aptitude complètent ces règles, sous la forme de tests
+Trois fonctions d'aptitude complètent ces règles, sous la forme de tests
 (`src/bootstrap/architecture.test.ts`) : chaque table est rangée dans le schéma d'une brique
-de la plateforme ou d'un module, et chaque module qui conserve des données déclare ses
-données personnelles.
+de la plateforme ou d'un module, chaque module qui conserve des données déclare ses
+données personnelles, et les événements du Pillage ne contiennent aucun nom de joueur ni de
+village (ADR 0010).
 
 Seule la racine de composition connaît à la fois la plateforme et l'ensemble des modules.
+
+## Parcours d'un pillage réussi
+
+Un pillage traverse trois modules : le Pillage décide, le Village prélève et verse les
+ressources, et le Classement compte le pillage réussi. Dans le cas ordinaire, toute la saga
+se déroule pendant la requête du joueur, grâce à la distribution qui suit le lancement.
+
+```mermaid
+sequenceDiagram
+  participant N as Navigateur d'Alice
+  participant R as Pillage
+  participant J as Journal et boîte d'envoi
+  participant V as Village
+  participant C as Classement
+  N->>R: POST /api/raid/raids, cible Bob
+  R->>J: Rattrapage de la projection des villages
+  R->>R: decide - niveau 3 contre 2, succès
+  R->>J: RaidLaunched et message realm.seize, une transaction
+  R->>J: Distribution de la boîte d'envoi
+  J->>V: realm.seize, moitié du stock de Bob
+  V->>J: ResourcesWithdrawn et réponse raid.transfer-result
+  J->>R: raid.transfer-result, 60 bois et 31 pierre
+  R->>J: RaidPlundered et message realm.deposit
+  J->>V: realm.deposit, butin versé à Alice
+  V->>J: ResourcesDeposited
+  R-->>N: 201, pillage réussi, butin
+  Note over C,J: Plus tard, à la consultation du classement
+  C->>J: Rattrapage de la projection, lecture de RaidPlundered
+  C->>C: Pillages du jour d'Alice, plus 1
+```
+
+Si la distribution est interrompue, le pillage reste en cours : les messages en attente sont
+distribués à la consultation suivante de l'historique, ou par la tâche quotidienne. Chaque
+étape est idempotente, et une panne ne crée ni ne perd aucune ressource.
 
 ## Extraction du Village
 
@@ -186,7 +236,7 @@ l'ensemble des contrôles a réussi, et les migrations ne sont appliquées qu'ap
 
 La tâche planifiée, déclarée dans `vercel.json`, exécute chaque jour les tâches quotidiennes :
 la distribution des messages restés en attente dans la boîte d'envoi, et l'application des
-durées de conservation de la Taverne. Elle ne s'exécute que sur le déploiement de production.
+durées de conservation de la Taverne et de l'historique du Pillage. Elle ne s'exécute que sur le déploiement de production.
 
 Le service Village extrait n'est pas déployé : en production, le Village s'exécute dans
 les fonctions Vercel, comme les autres modules (ADR 0009).
