@@ -46,6 +46,7 @@ export function createRaidModule({
   return {
     api: createRaidApi(service),
     handlers: createRaidHandlers(service),
+    dailyTask: service.purge,
     personalData: createRaidPersonalData(store, db),
   }
 }

@@ -2,6 +2,7 @@ import { REALM_TOPICS, STARTING_LEVELS } from '@/modules/realm/contracts'
 import { withOptimisticRetry } from '@/platform/event-store/retry'
 import type { NewMessage } from '@/platform/outbox/outbox'
 import { RAID_TOPICS } from '../contracts'
+import { HISTORY_RETENTION_MS } from '../domain/content'
 import {
   decide,
   evolve,
@@ -138,7 +139,15 @@ export function createRaidService(
    */
   async function list(viewerId: string) {
     await dispatch()
-    return history.list(viewerId)
+    return history.list(viewerId, clock() - HISTORY_RETENTION_MS)
+  }
+
+  /**
+   * Tâche quotidienne : applique la durée de conservation de l'historique, même si personne
+   * ne consulte le Pillage. Renvoie le nombre de pillages supprimés de l'historique.
+   */
+  async function purge() {
+    return { raids: await history.removeOlderThan(clock() - HISTORY_RETENTION_MS) }
   }
 
   /**
@@ -150,7 +159,7 @@ export function createRaidService(
     if (!decision.ok) throw new Error(`Pillage de ${attackerId} : ${decision.error.code}`)
   }
 
-  return { launch, targets, list, step }
+  return { launch, targets, list, step, purge }
 }
 
 /** Type du service, déduit de sa fabrique. */

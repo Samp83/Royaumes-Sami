@@ -1,4 +1,4 @@
-import { desc, eq, inArray, or } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, lt, or } from 'drizzle-orm'
 import type { Db } from '@/platform/db/client'
 import { ERASED_VILLAGE } from '@/platform/privacy/privacy'
 import type { ProjectionRunner } from '@/platform/projection/projection'
@@ -15,14 +15,21 @@ const HISTORY_SIZE = 50
 /** Adaptateur du port RaidsReader, fondé sur les tables de l'historique et des villages. */
 export function createDrizzleRaidsReader(db: Db, projections: ProjectionRunner): RaidsReader {
   return {
-    async list(viewerId) {
+    async list(viewerId, since) {
       await projections.catchUp(raidsProjection)
       await projections.catchUp(villagesProjection)
 
       const rows = await db
         .select()
         .from(raids)
-        .where(or(eq(raids.attackerId, viewerId), eq(raids.defenderId, viewerId)))
+        .where(
+          and(
+            or(eq(raids.attackerId, viewerId), eq(raids.defenderId, viewerId)),
+            // Les pillages plus anciens que la durée de conservation ne sont jamais présentés,
+            // même s'ils n'ont pas encore été supprimés par la tâche quotidienne.
+            gte(raids.launchedAt, since),
+          ),
+        )
         .orderBy(desc(raids.launchedAt))
         .limit(HISTORY_SIZE)
 
@@ -54,6 +61,17 @@ export function createDrizzleRaidsReader(db: Db, projections: ProjectionRunner):
           launchedAt: row.launchedAt,
         }
       })
+    },
+
+    async removeOlderThan(before) {
+      // La projection est d'abord rattrapée : un pillage ancien pas encore appliqué serait
+      // sinon inséré après la suppression.
+      await projections.catchUp(raidsProjection)
+      const removed = await db
+        .delete(raids)
+        .where(lt(raids.launchedAt, before))
+        .returning({ raidId: raids.raidId })
+      return removed.length
     },
   }
 }

@@ -12,3 +12,6 @@ export const SAME_TARGET_DELAY_MS = 5 * 60_000
 
 /** Probabilité de succès d'un pillage lorsque les deux villages ont le même niveau combiné. */
 export const TIE_SUCCESS_CHANCE = 0.5
+
+/** Durée de conservation de l'historique des pillages présenté aux joueurs : 30 jours. */
+export const HISTORY_RETENTION_MS = 30 * 24 * 60 * 60_000

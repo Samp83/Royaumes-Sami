@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { RaidSummary, RaidView, Target } from '@/modules/raid/contracts'
 import type { RankingEntry } from '@/modules/ranking/contracts'
 import type { Levels, Stock } from '@/modules/realm/contracts'
-import { createTestApi } from './testing'
+import { createTestApi, TEST_CRON_SECRET } from './testing'
 
 type TestApi = Awaited<ReturnType<typeof createTestApi>>
 
@@ -191,5 +191,26 @@ describe('API du module Pillage', () => {
     const raidsOf = (player: string) => entries.find((e) => e.playerId === player)?.raidsToday
     expect(raidsOf('alice')).toBe(1)
     expect(raidsOf('bob')).toBe(0)
+  })
+
+  it("ne présente plus un pillage de plus de 30 jours, et le supprime de l'historique chaque jour", async () => {
+    const api = await withVillages()
+    await aliceStronger(api)
+    await raid(api, 'alice', 'bob')
+    api.advance(30 * 24 * 60)
+    // À 30 jours exactement, le pillage est encore présenté ; au-delà, il ne l'est plus.
+    expect(await historyOf(api, 'alice')).toHaveLength(1)
+    api.advance(1)
+    expect(await historyOf(api, 'alice')).toEqual([])
+
+    // La tâche quotidienne le supprime de l'historique, même si personne ne l'a consulté.
+    const daily = async () =>
+      (
+        await api.api.request('/api/cron/daily', {
+          headers: { authorization: `Bearer ${TEST_CRON_SECRET}` },
+        })
+      ).json()
+    expect((await daily()).raid).toEqual({ ok: true, result: { raids: 1 } })
+    expect((await daily()).raid).toEqual({ ok: true, result: { raids: 0 } })
   })
 })
