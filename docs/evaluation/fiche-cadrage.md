@@ -62,6 +62,11 @@ pillages réussis à partir de leurs événements, comme il compte les expéditi
 flux par attaquant, `raid-<joueur>`, permet de faire respecter les règles 3 et 4 par la
 concurrence optimiste du journal, sans lire d'autre flux.
 
+Le module tient aussi deux modèles de lecture, dans son propre schéma `raid`, créé par sa
+migration : la table des villages (`raid.villages`), tenue par la projection du langage publié
+du Village, et l'historique des pillages (`raid.raids`), tenu par la projection de ses propres
+événements.
+
 ## La communication avec les modules existants
 
 - **Village vers Pillage, par lecture du langage publié** : une projection du module tient les
@@ -76,15 +81,21 @@ concurrence optimiste du journal, sans lire d'autre flux.
   existant `realm.deposit`. Les gestionnaires restent idempotents.
 - **Pillage vers Classement, par lecture du langage publié** : la projection du Classement lit
   les événements de pillage réussi du Pillage, et sa version est augmentée afin qu'elle soit
-  reconstruite.
+  reconstruite. Elle les compte dans une nouvelle table du schéma du Classement
+  (`ranking.raids_by_day`), créée par une migration distincte de celle du Pillage : c'est le
+  Classement qui la possède et la remplit.
 
 ## Les données personnelles
 
 - L'identifiant de l'attaquant et celui du défenseur, dans les événements et les messages du
-  module. Les événements ne contiennent aucun nom : le nom d'un village est retrouvé à
-  l'affichage.
+  module, et dans la table de l'historique. Les événements ne contiennent aucun nom : le nom
+  d'un village est retrouvé à l'affichage.
 - Le nom de chaque village, dans la table de la projection des cibles.
 - Les pillages réussis par jour de chaque joueur, dans la table du Classement.
+
+L'historique des pillages présenté aux joueurs est conservé 30 jours : au-delà, un pillage
+n'est plus présenté, et une tâche quotidienne le supprime de la table de l'historique. Le
+journal conserve ses événements.
 
 Le contributeur `personal-data.ts` exporte les pillages lancés et subis par le joueur, et
 efface son nom de village dans la table des cibles.
@@ -94,7 +105,7 @@ efface son nom de village dans la table des cibles.
 1. B4 : la projection des niveaux et des noms de villages, avec son point de reprise et sa
    version.
 2. B6 : une communication avec deux modules existants, le Village et le Classement.
-3. B2 : la limite d'un pillage toutes les cinq minutes contre un même village, appliquée sans
-   tâche de fond.
+3. B2 : une tâche quotidienne propre au module, qui supprime de l'historique les pillages de
+   plus de 30 jours.
 4. B8 : une fonction d'aptitude qui vérifie que les événements du Pillage ne contiennent aucun
    nom de joueur ni de village.
