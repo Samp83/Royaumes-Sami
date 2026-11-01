@@ -215,6 +215,8 @@ function launch(
   if (!attacker) return fail({ code: 'NO_VILLAGE' })
   if (defenderId === attackerId) return fail({ code: 'SELF_RAID' })
   if (!defender) return fail({ code: 'TARGET_NOT_FOUND' })
+  // DETTE TECHNIQUE DT-011 (docs/qualite/dette-technique.md) : un pillage dont un message est
+  // abandonné par la boîte d'envoi reste en cours, et bloque l'attaquant jusqu'à sa relance.
   if (state.current) return fail({ code: 'RAID_IN_PROGRESS' })
   const last = state.lastRaidAt[defenderId]
   if (last !== undefined && now < last + SAME_TARGET_DELAY_MS) {

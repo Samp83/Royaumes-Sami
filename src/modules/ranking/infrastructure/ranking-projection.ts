@@ -128,6 +128,8 @@ export const rankingProjection: Projection = {
 
       // Un pillage réussi, compté le jour de sa conclusion pour l'attaquant, désigné par le
       // nom du flux : « raid-alice » donne « alice ».
+      // DETTE TECHNIQUE DT-012 (docs/qualite/dette-technique.md) : les compteurs des jours passés
+      // ne sont jamais supprimés, alors que seul le jour en cours est présenté.
       case 'RaidPlundered': {
         const data = event.data as unknown as RaidPlunderedData
         await tx

@@ -7,6 +7,8 @@ import { villages } from './schema'
 import { villagesProjection } from './villages-projection'
 
 /** Nombre maximal de villages présentés comme cibles. */
+// DETTE TECHNIQUE DT-013 (docs/qualite/dette-technique.md) : au-delà de 100 villages, les
+// suivants par ordre de nom ne sont plus proposés ; il n'y a ni pagination ni recherche.
 const TARGETS_SIZE = 100
 
 /** Adaptateur du port VillagesReader, fondé sur la table des villages de la projection. */
