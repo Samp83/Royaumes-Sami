@@ -63,6 +63,19 @@ describe('API du module Pillage', () => {
     expect((await res.json()).error.code).toBe('INVALID_INPUT')
   })
 
+  it('lance toujours le pillage au nom du joueur connecté, quel que soit le corps de la requête', async () => {
+    const api = await withVillages()
+    // Un attaquant indiqué dans le corps est ignoré par la validation : c'est Alice qui pille.
+    const res = await api.post(
+      '/api/raid/raids',
+      { defenderId: 'carol', attackerId: 'bob' },
+      'alice',
+    )
+    expect(res.status).toBe(201)
+    expect(await historyOf(api, 'alice')).toMatchObject([{ role: 'attacker' }])
+    expect(await historyOf(api, 'bob')).toEqual([])
+  })
+
   it('présente les villages des autres joueurs, sans leur niveau (règle 13)', async () => {
     const api = await withVillages()
     const res = await api.get('/api/raid/targets', 'alice')
@@ -162,6 +175,55 @@ describe('API du module Pillage', () => {
       { role: 'defender', opponentVillage: 'Village de alice', loot: { wood: 60, stone: 31 } },
     ])
     expect(await historyOf(api, 'carol')).toEqual([])
+  })
+
+  it("ne présente la perte de niveau qu'à l'attaquant", async () => {
+    const api = await withVillages()
+    await aliceStronger(api)
+    await upgrade(api, 'bob', 'mine')
+    api.advance(10)
+    await upgrade(api, 'alice', 'sawmill')
+    await raid(api, 'bob', 'alice')
+
+    expect(await historyOf(api, 'bob')).toMatchObject([
+      { role: 'attacker', outcome: 'failure', lostBuilding: 'mine' },
+    ])
+    expect(await historyOf(api, 'alice')).toMatchObject([
+      { role: 'defender', outcome: 'failure', lostBuilding: null },
+    ])
+  })
+
+  it("départage deux lancements simultanés d'un même joueur contre le même village (règles 3 et 4)", async () => {
+    const api = await withVillages()
+    await aliceStronger(api)
+
+    const results = await Promise.all([raid(api, 'alice', 'bob'), raid(api, 'alice', 'bob')])
+    const statuses = results.map((r) => r.res.status).sort()
+    expect(statuses).toEqual([201, 409])
+    // Un seul pillage a eu lieu : Bob n'a perdu qu'une fois la moitié de son stock.
+    expect(await historyOf(api, 'alice')).toHaveLength(1)
+    expect((await villageOf(api, 'bob')).stock).toMatchObject({ wood: 60, stone: 31 })
+  })
+
+  it("n'ouvre aucun canal temps réel sur les flux du Pillage (403)", async () => {
+    const api = await withVillages()
+    await raid(api, 'alice', 'bob')
+    // Le flux d'un attaquant contient les niveaux comparés : il n'est diffusé à personne,
+    // pas même à son propriétaire.
+    expect((await api.get('/api/stream/raid-alice/events?after=0', 'alice')).status).toBe(403)
+    expect((await api.get('/api/stream/raid-alice/events?after=0', 'bob')).status).toBe(403)
+  })
+
+  it('annonce les pillages réussis sur le canal du Classement, sans leurs données', async () => {
+    const api = await withVillages()
+    await aliceStronger(api)
+    await raid(api, 'alice', 'bob')
+
+    const res = await api.get('/api/stream/ranking/events?after=0', 'carol')
+    const { events } = (await res.json()) as { events: { type: string; data: object }[] }
+    const plundered = events.filter((e) => e.type === 'RaidPlundered')
+    expect(plundered).toHaveLength(1)
+    expect(plundered[0].data).toEqual({})
   })
 
   it('exporte les pillages du joueur, et efface le nom de son village lors de la suppression du compte', async () => {

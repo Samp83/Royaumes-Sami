@@ -23,7 +23,7 @@ L'application est disponible à l'adresse http://localhost:3000.
 L'espace de jeu est réservé aux joueurs connectés. Créez un compte depuis la page
 http://localhost:3000/login.
 
-Les variables d'environnement sont documentées dans le fichier `.env.example`. En local,
+Les variables d'environnement sont documentées dans le fichier `.env.exemple`. En local,
 aucune n'est obligatoire. Pour définir vos propres valeurs, copiez ce fichier en
 `.env.local`, qui n'est jamais versionné.
 
@@ -190,7 +190,7 @@ erreur. Il est exécuté sur la construction de production, base recréée, avec
 ## Déploiement
 
 L'application est déployée sur Vercel, dans la région de Francfort ; son adresse est
-indiquée dans la rubrique « About » du dépôt GitHub. Chaque envoi sur la branche `main`
+indiquée dans la rubrique « About » du dépôt GitHub. Chaque envoi sur la branche `master`
 déclenche un déploiement, qui n'aboutit que si `pnpm verify` réussit.
 
 Les variables `DATABASE_URL` et `DATABASE_URL_UNPOOLED` sont fournies par l'intégration
@@ -206,14 +206,17 @@ sans la première ; sans la seconde, la route des tâches quotidiennes reste fer
 - [Revue de sécurité de l'authentification](docs/qualite/revue-securite-authentification.md)
 - [Revue de sécurité du Donjon](docs/qualite/revue-securite-donjon.md)
 - [Revue de sécurité du Marché](docs/qualite/revue-securite-marche.md)
+- [Revue de sécurité du Pillage](docs/qualite/revue-securite-pillage.md)
 - [Registre des traitements](docs/rgpd/registre-traitements.md)
 - [Revue de conformité au RGPD](docs/rgpd/revue-conformite.md)
 - [Bilan technique](docs/bilan-technique.md)
+- Évaluation : [fiche de cadrage](docs/evaluation/fiche-cadrage.md) et
+  [document de rendu](docs/evaluation/rendu.md)
 
 ## Conventions
 
 - Messages de commit conformes à Conventional Commits.
-- `pnpm verify` doit réussir avant tout envoi sur la branche `main`.
+- `pnpm verify` doit réussir avant tout envoi sur la branche `master`.
 
 ## Limites actuelles
 

@@ -231,7 +231,7 @@ flowchart LR
   cron["Tâche planifiée Vercel<br/>chaque jour à 4 h UTC"] -->|"GET /api/cron/daily<br/>(secret CRON_SECRET)"| fonctions
 ```
 
-Chaque envoi sur la branche `main` déclenche un déploiement. Le code n'est publié que si
+Chaque envoi sur la branche `master` déclenche un déploiement. Le code n'est publié que si
 l'ensemble des contrôles a réussi, et les migrations ne sont appliquées qu'après ces contrôles.
 
 La tâche planifiée, déclarée dans `vercel.json`, exécute chaque jour les tâches quotidiennes :
